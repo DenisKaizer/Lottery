@@ -99,7 +99,8 @@ contract Lottery is Ownable, Stateful {
   address lotteryManager;
   Ticket winTicket;
   ERC20 betToken;
-
+  uint startLotteryBlock;
+  uint stopLotteryBlock;
   modifier onlyOwnerOrLotteryManager() {
     require(msg.sender == owner || msg.sender == lotteryManager);
     _;
@@ -115,7 +116,7 @@ contract Lottery is Ownable, Stateful {
     _;
   }
 
-  function Lottery(address _token) {
+  function Lottery(address _token,uint startLotteryBlock,uint stopLotteryBlock) {
     betToken = ERC20(_token);
     dataPrize[50] = 1000000; // 1/11,688,053.52
     dataPrize[41] = 50000; // 1/913,129.18
@@ -165,6 +166,8 @@ contract Lottery is Ownable, Stateful {
 
 
   function chooseWinnersTicket() onlyOwnerOrLotteryManager {
+      
+    require(block.number > startLotteryBlock);
     winTicket.wb1 = random(69);
     winTicket.wb2 = random(69);
     winTicket.wb3 = random(69);
@@ -173,7 +176,13 @@ contract Lottery is Ownable, Stateful {
     winTicket.rb = random(26);
     setState(State.sellIsOver);
   }
-
+  function refund() {
+    require(block.number > stopLotteryBlock);
+    betToken.transfer(msg.sender, 2 * 1 ether);
+    //TODO add deleting from tickets 
+    
+      
+  }
   function checkMyTicket(address player) lotteryFinished view returns(uint256) {
     uint256 count;
     Ticket _ticket;
