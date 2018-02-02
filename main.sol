@@ -49,8 +49,10 @@ contract LotteryFactory is Ownable {
   address[] lotteries;
   address token = 0x0;
 
-  function createLottery() onlyOwner {
-    lotteries.push(new Lottery(token, owner));
+  function createLottery(uint _startLotteryBlock,uint _stopLotteryBlock) onlyOwner {
+    address newLottery = new Lottery( token, owner, _startLotteryBlock, _stopLotteryBlock);
+    lotteries.push(newLottery);
+    //betToken.transfer(newLottery, tokenAmount);
   }
 }
 
@@ -198,9 +200,9 @@ contract Lottery is Ownable, Stateful {
   function refund() {
     require(block.number > stopLotteryBlock);
     betToken.transfer(msg.sender, 2 * 1 ether);
-    //TODO add deleting from tickets 
-    
-      
+    //TODO add deleting from tickets
+
+
   }
   function checkMyTicket(address player) lotteryFinished view returns(uint256) {
     uint256 count;
@@ -210,24 +212,24 @@ contract Lottery is Ownable, Stateful {
       uint8 wbCount;
       uint8 rb;
       if (_ticket.wb1 == winTicket.wb1) {
-        wbcount++;
+        wbCount++;
       }
       if (_ticket.wb2 == winTicket.wb2) {
-        wbcount++;
+        wbCount++;
       }
       if (_ticket.wb3 == winTicket.wb3) {
-        wbcount++;
+        wbCount++;
       }
       if (_ticket.wb4 == winTicket.wb4) {
-        wbcount++;
+        wbCount++;
       }
       if (_ticket.wb5 == winTicket.wb5) {
-        wbcount++;
+        wbCount++;
       }
       if (_ticket.rb == winTicket.rb) {
         rb = 1;
       }
-      uint8 category = wbcount * 10 + rb;
+      uint8 category = wbCount * 10 + rb;
       if (category == 51) {
         count += jackpot;
       }
@@ -245,10 +247,10 @@ contract Lottery is Ownable, Stateful {
     reward = checkMyTicket(msg.sender);
     betToken.transfer(msg.sender, reward);
     // delete from mapping
-    Reward(reward);
+    RewardRecieved(reward);
   }
 
-  function closeLottery() onlyCrowdsaleManagerOrOwner {
+  function closeLottery() onlyOwnerOrLotteryManager {
     setState(State.lotteryClosed);
     uint256 tokenAmount;
     tokenAmount = betToken.balanceOf(this);
