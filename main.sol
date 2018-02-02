@@ -174,34 +174,42 @@ contract Lottery is Ownable, Stateful {
     setState(State.sellIsOver);
   }
 
-  function checkMyTicket() lotteryFinished view returns(uint256) {
+  function checkMyTicket(address player) lotteryFinished view returns(uint256) {
     uint256 count;
     Ticket _ticket;
-    for (uint i = 0; i < usersTickets[msg.sender].length; i++) {
-      _ticket = usersTickets[msg.sender][i];
+    for (uint i = 0; i < usersTickets[player].length; i++) {
+      _ticket = usersTickets[player][i];
       uint8 wbcount;
       uint8 rb;
       if (_ticket.wb1 == winTicket.wb1) {
         wbcount++;
       }
-      if (_ticket.wb2 == winTicket.wb1) {
+      if (_ticket.wb2 == winTicket.wb2) {
         wbcount++;
       }
-      if (_ticket.wb3 == winTicket.wb1) {
+      if (_ticket.wb3 == winTicket.wb3) {
         wbcount++;
       }
-      if (_ticket.wb4 == winTicket.wb1) {
+      if (_ticket.wb4 == winTicket.wb4) {
         wbcount++;
       }
-      if (_ticket.wb5 == winTicket.wb1) {
+      if (_ticket.wb5 == winTicket.wb5) {
         wbcount++;
       }
       if (_ticket.rb == winTicket.rb) {
         rb = 1;
       }
-      count += dataPrize[wbcount*10 + rb];
+      count += dataPrize[wbcount*10 + rb] * dataPowerPlay[_ticket.pp];
     }
     return count;
   }
+
+  function getReward() {
+    uint256 reward;
+    reward = checkMyTicket(msg.sender);
+    betToken.transfer(msg.sender, reward);
+  }
+
+
 
 }
