@@ -42,20 +42,6 @@ contract Ownable {
 
 }
 
-contract LotteryFactory is Ownable {
-
-  uint256 jackpot;
-  uint256 lotteryCounter;
-  address[] lotteries;
-  address token = 0x0;
-
-  function createLottery(uint _startLotteryBlock,uint _stopLotteryBlock) onlyOwner {
-    address newLottery = new Lottery( token, owner, _startLotteryBlock, _stopLotteryBlock);
-    lotteries.push(newLottery);
-    //betToken.transfer(newLottery, tokenAmount);
-  }
-}
-
 contract ERC20 {  // ERC20 interface
   uint public totalSupply;
 
@@ -72,25 +58,44 @@ contract ERC20 {  // ERC20 interface
   event Transfer(address indexed from, address indexed to, uint value);
 }
 
-contract Stateful {
-  enum State {
-  Init,
-  sellIsActive,
-  sellIsOver,
-  lotteryClosed
-  }
-  State public state = State.Init;
+contract ReentrancyGuard {
 
-  event StateChanged(State oldState, State newState);
+  /**
+   * @dev We use a single lock for the whole contract.
+   */
+  bool private rentrancy_lock = false;
 
-  function setState(State newState) internal {
-    State oldState = state;
-    state = newState;
-    StateChanged(oldState, newState);
+  /**
+   * @dev Prevents a contract from calling itself, directly or indirectly.
+   * @notice If you mark a function `nonReentrant`, you should also
+   * mark it `external`. Calling one nonReentrant function from
+   * another is not supported. Instead, you can implement a
+   * `private` function doing the actual work, and a `external`
+   * wrapper marked as `nonReentrant`.
+   */
+  modifier nonReentrant() {
+    require(!rentrancy_lock);
+    rentrancy_lock = true;
+    _;
+    rentrancy_lock = false;
   }
 }
 
-contract Lottery is Ownable, Stateful {
+contract LotteryFactory is Ownable {
+
+  uint256 jackpot;
+  uint256 lotteryCounter;
+  address[] lotteries;
+  address token = 0x0;
+
+  function createLottery(uint _startLotteryBlock,uint _stopLotteryBlock, uint _closeLotteryBlock) onlyOwner {
+    address newLottery = new Lottery( token, owner, _startLotteryBlock, _stopLotteryBlock, _closeLotteryBlock);
+    lotteries.push(newLottery);
+    //betToken.transfer(newLottery, tokenAmount);
+  }
+}
+
+contract Lottery is Ownable, ReentrancyGuard {
 
   struct Ticket {
   uint8 wb1;
@@ -104,17 +109,19 @@ contract Lottery is Ownable, Stateful {
 
   uint8 _seed = 0;
 
-  mapping (uint8 => uint) dataPrize; // 50 => 1000000, 41 => 50000, ......
-  mapping (address => uint8) ticketsNumber;
+  mapping (uint8 => uint) public dataPrize; // 50 => 1000000, 41 => 50000, ......
   mapping (address => Ticket[]) public usersTickets;
   mapping (uint8 => uint) public dataPowerPlay;
-  uint256 jackpot;
+  uint256 public jackpot;
   address lotteryManager;
-  Ticket winTicket;
+  Ticket public winTicket;
   ERC20 betToken;
-  uint startLotteryBlock;
-  uint stopLotteryBlock;
+  uint public startLotteryBlock; // after this block new tickets will not accepted
+  uint public stopLotteryBlock; // after this block wiiner's tikcet must be choosen
+  uint public closeLotteryBlock; // all players must get their reward before this block
+  uint public blockForRandom;  //  this block will be use as a seed
   address factory;
+  bool public winTicketChoosen;
 
   modifier onlyOwnerOrLotteryManager() {
     require(msg.sender == owner || msg.sender == lotteryManager);
@@ -122,16 +129,21 @@ contract Lottery is Ownable, Stateful {
   }
 
   modifier sellIsActive() {
-    require(state == State.sellIsActive);
+    require(block.number < startLotteryBlock);
     _;
   }
 
-  modifier lotteryFinished() {
-    require(state == State.sellIsOver);
+  modifier sellFinished() {
+    require(block.number > startLotteryBlock);
     _;
   }
 
-  function Lottery(address _token, address _owner,uint _startLotteryBlock,uint _stopLotteryBlock) {
+  function Lottery(address _token,
+  address _owner,
+  uint _startLotteryBlock,
+  uint _stopLotteryBlock,
+  uint _closeLotteryBlock ) {
+    require(startLotteryBlock + 249 < stopLotteryBlock && stopLotteryBlock + 5952 < closeLotteryBlock);
     betToken = ERC20(_token);
     dataPrize[50] = 1000000; // 1/11,688,053.52
     dataPrize[41] = 50000; // 1/913,129.18
@@ -151,6 +163,8 @@ contract Lottery is Ownable, Stateful {
     owner = owner;
     startLotteryBlock = _startLotteryBlock;
     stopLotteryBlock = _stopLotteryBlock;
+    closeLotteryBlock = _closeLotteryBlock;
+    blockForRandom = stopLotteryBlock + 248; // 248 blocks = 1 hour
     factory = msg.sender;
   }
 
@@ -177,16 +191,13 @@ contract Lottery is Ownable, Stateful {
   }
 
   function random(uint8 upper) public returns (uint8 randomNumber) {
-    _seed = uint8(sha3(sha3(block.blockhash(block.number), _seed), now));
+    _seed = uint8(sha3(block.blockhash(blockForRandom), _seed));
     return _seed % upper;
   }
 
-  function startSale() onlyOwnerOrLotteryManager {
-    setState(State.sellIsActive);
-  }
+  event WinTicketChoosen();
 
-
-  function chooseWinnersTicket() onlyOwnerOrLotteryManager {
+  function chooseWinTicket() onlyOwnerOrLotteryManager {
     require(block.number > startLotteryBlock);
     winTicket.wb1 = random(69);
     winTicket.wb2 = random(69);
@@ -194,17 +205,21 @@ contract Lottery is Ownable, Stateful {
     winTicket.wb4 = random(69);
     winTicket.wb5 = random(69);
     winTicket.rb = random(26);
-    setState(State.sellIsOver);
+    winTicketChoosen = true;
+    WinTicketChoosen();
   }
 
-  function refund() {
-    require(block.number > stopLotteryBlock);
-    betToken.transfer(msg.sender, 2 * 1 ether);
-    //TODO add deleting from tickets
-
-
+  function refund() nonReentrant {
+    require(block.number > stopLotteryBlock && winTicketChoosen == false);
+    uint valueToRefund;
+    valueToRefund = 2 * usersTickets[msg.sender].length * 1 ether;
+    delete usersTickets[msg.sender];
+    betToken.transfer(msg.sender, valueToRefund);
   }
-  function checkMyTicket(address player) lotteryFinished view returns(uint256) {
+
+
+  function checkMyTicket(address player)  view returns(uint256) {
+    require(winTicketChoosen);
     uint256 count;
     Ticket _ticket;
     for (uint i = 0; i < usersTickets[player].length; i++) {
@@ -242,16 +257,17 @@ contract Lottery is Ownable, Stateful {
 
   event RewardRecieved(uint256);
 
-  function getReward() {
+  function getReward() nonReentrant {
     uint256 reward;
     reward = checkMyTicket(msg.sender);
+    delete usersTickets[msg.sender];
     betToken.transfer(msg.sender, reward);
-    // delete from mapping
     RewardRecieved(reward);
   }
 
+
+
   function closeLottery() onlyOwnerOrLotteryManager {
-    setState(State.lotteryClosed);
     uint256 tokenAmount;
     tokenAmount = betToken.balanceOf(this);
     betToken.transfer(factory, tokenAmount);
