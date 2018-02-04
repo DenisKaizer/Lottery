@@ -86,7 +86,7 @@ contract LotteryFactory is Ownable {
   uint256 jackpot;
   uint256 lotteryCounter;
   address[] lotteries;
-  address token = 0x0;
+  address token = 0x0; // 0x95A48dca999c89e4E284930D9b9af973a7481287 Ropsten's Bet
 
   function createLottery(uint _startLotteryBlock,uint _stopLotteryBlock, uint _closeLotteryBlock) onlyOwner {
     address newLottery = new Lottery( token, owner, _startLotteryBlock, _stopLotteryBlock, _closeLotteryBlock);
