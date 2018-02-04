@@ -182,12 +182,12 @@ contract Lottery is Ownable, ReentrancyGuard {
   uint8 pp) sellIsActive
   {
     require((wb1 <= 69) && (wb2 <= 69) && (wb3 <= 69) && (wb4 <= 69) && (wb5 <= 69) && (rb <= 26));
-    //require(betToken.allowance(msg.sender, this) >=  2 * 1 ether);
+    require(betToken.allowance(msg.sender, this) >=  2 * 1 ether);
     require(usersTickets[msg.sender].length < 25);
-    //uint tokenAmount = 2 * 1 ether;
-    //betToken.transferFrom(msg.sender, this, tokenAmount);
+    uint tokenAmount = 2 * 1 ether;
+    betToken.transferFrom(msg.sender, this, tokenAmount);
     usersTickets[msg.sender].push(Ticket(wb1, wb2, wb3, wb4, wb5, rb, pp));
-    //jackpot += tokenAmount;
+    jackpot += tokenAmount;
   }
 
   function random(uint8 upper) public returns (uint8 randomNumber) {
