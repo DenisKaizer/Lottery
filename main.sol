@@ -42,8 +42,6 @@ contract Ownable {
 
 }
 
-pragma solidity 0.4.19;
-
 /**
  * @title ERC20Basic
  * @dev Simpler version of ERC20 interface
