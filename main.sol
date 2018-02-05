@@ -329,7 +329,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   uint _startLotteryBlock,
   uint _stopLotteryBlock,
   uint _closeLotteryBlock ) {
-    require(startLotteryBlock + 249 < stopLotteryBlock && stopLotteryBlock + 5952 < closeLotteryBlock);
+    require(_startLotteryBlock + 249 < _stopLotteryBlock && _stopLotteryBlock + 5952 < _closeLotteryBlock);
     betToken = ERC20(_token);
     dataPrize[50] = 1000000; // 1/11,688,053.52
     dataPrize[41] = 50000; // 1/913,129.18
