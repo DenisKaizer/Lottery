@@ -238,7 +238,7 @@ contract Nafen is Mintable {
 
   string public constant symbol = "TEB";
 
-  uint32 public constant decimals = 18;
+  uint32 public constant decimals = 8;
 
 }
 
@@ -396,7 +396,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   function refund() nonReentrant {
     require(block.number > stopLotteryBlock && winTicketChoosen == false);
     uint valueToRefund;
-    valueToRefund = 2 * usersTickets[msg.sender].length * 1 ether;
+    valueToRefund = 2 * usersTickets[msg.sender].length * 100000000; // decimals 8
     delete usersTickets[msg.sender];
     betToken.transfer(msg.sender, valueToRefund);
   }
