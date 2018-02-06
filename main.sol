@@ -267,16 +267,39 @@ contract ReentrancyGuard {
 
 contract LotteryFactory is Ownable {
 
-  uint256 jackpot;
+  uint256 public jackpot;
   uint256 lotteryCounter;
-  address[] lotteries;
-  address token = 0x0; // 0x95A48dca999c89e4E284930D9b9af973a7481287 Ropsten's Bet
+  mapping (address => bool) public lotteries;
+  address token;
+  ERC20 betToken;
 
-  function createLottery(uint _startLotteryBlock,uint _stopLotteryBlock, uint _closeLotteryBlock) onlyOwner {
-    address newLottery = new Lottery( token, owner, _startLotteryBlock, _stopLotteryBlock, _closeLotteryBlock);
-    lotteries.push(newLottery);
-    //betToken.transfer(newLottery, tokenAmount);
+
+  function LotteryFactory(address _token) {
+    token = _token;
+    betToken = ERC20(_token);
   }
+
+  function createLottery(
+  uint _startLotteryBlock,
+  uint _stopLotteryBlock,
+  uint _closeLotteryBlock,
+  uint256 _tokenAmount) onlyOwner
+  {
+    require(betToken.balanceOf(this) >= _tokenAmount);
+    address newLottery = new Lottery(token, owner, _startLotteryBlock, _stopLotteryBlock, _closeLotteryBlock);
+    lotteries[newLottery] = true;
+    betToken.transfer(newLottery, _tokenAmount);
+  }
+
+  function payJackpot(address _to) {
+    require(lotteries[msg.sender]);
+    betToken.transfer(_to, jackpot);
+  }
+
+  function closeLottery() {
+    lotteries[msg.sender] = false;
+  }
+
 }
 
 contract Lottery is Ownable, ReentrancyGuard {
@@ -296,7 +319,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   mapping (uint8 => uint) public dataPrize; // 50 => 1000000, 41 => 50000, ......
   mapping (address => Ticket[]) public usersTickets;
   mapping (uint8 => uint) public dataPowerPlay;
-  uint256 public jackpot;
+  uint256 jackpot;
   address lotteryManager;
   Ticket public winTicket;
   ERC20 betToken;
@@ -348,7 +371,7 @@ contract Lottery is Ownable, ReentrancyGuard {
     startLotteryBlock = _startLotteryBlock;
     stopLotteryBlock = _stopLotteryBlock;
     closeLotteryBlock = _closeLotteryBlock;
-    blockForRandom = stopLotteryBlock + 248; // 248 blocks = 1 hour
+    blockForRandom = startLotteryBlock + 248; // 248 blocks = 1 hour
     factory = msg.sender;
   }
 
@@ -366,15 +389,16 @@ contract Lottery is Ownable, ReentrancyGuard {
   uint8 pp) sellIsActive
   {
     require((wb1 <= 69) && (wb2 <= 69) && (wb3 <= 69) && (wb4 <= 69) && (wb5 <= 69) && (rb <= 26));
-    require(betToken.allowance(msg.sender, this) >=  2 * 1 ether);
+    require(betToken.allowance(msg.sender, this) >=  2 * 100000000);
     require(usersTickets[msg.sender].length < 25);
-    uint tokenAmount = 2 * 1 ether;
+    uint tokenAmount = 2 * 100000000;
     betToken.transferFrom(msg.sender, this, tokenAmount);
     usersTickets[msg.sender].push(Ticket(wb1, wb2, wb3, wb4, wb5, rb, pp));
     jackpot += tokenAmount;
   }
 
   function random(uint8 upper) public returns (uint8 randomNumber) {
+    require(block.number > blockForRandom);
     _seed = uint8(sha3(block.blockhash(blockForRandom), _seed));
     return _seed % upper;
   }
@@ -382,7 +406,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   event WinTicketChoosen();
 
   function chooseWinTicket() onlyOwnerOrLotteryManager {
-    require(block.number > startLotteryBlock);
+    require(block.number > blockForRandom);
     winTicket.wb1 = random(69);
     winTicket.wb2 = random(69);
     winTicket.wb3 = random(69);
@@ -402,9 +426,9 @@ contract Lottery is Ownable, ReentrancyGuard {
   }
 
 
-  function checkMyTicket(address player)  view returns(uint256) {
+  function checkMyTicket(address player)  view returns(uint256[2]) {
     require(winTicketChoosen);
-    uint256 count;
+    uint256[2] count;
     Ticket _ticket;
     for (uint i = 0; i < usersTickets[player].length; i++) {
       _ticket = usersTickets[player][i];
@@ -430,31 +454,41 @@ contract Lottery is Ownable, ReentrancyGuard {
       }
       uint8 category = wbCount * 10 + rb;
       if (category == 51) {
-        count += jackpot;
+        count[1] = 1;
       }
       else {
-        count += dataPrize[category] * dataPowerPlay[_ticket.pp];
+        count[0] += dataPrize[category]; //  * dataPowerPlay[_ticket.pp]
       }
     }
     return count;
   }
 
   event RewardRecieved(uint256);
+  event jackpotRecieved();
 
   function getReward() nonReentrant {
     uint256 reward;
-    reward = checkMyTicket(msg.sender);
+    uint256 jack;
+    reward = checkMyTicket(msg.sender)[0];
+    jack = checkMyTicket(msg.sender)[1];
     delete usersTickets[msg.sender];
-    betToken.transfer(msg.sender, reward);
-    RewardRecieved(reward);
+    if (reward > 0) {
+      betToken.transfer(msg.sender, reward);
+      RewardRecieved(reward);
+    }
+    if (jack == 1) {
+      betToken.transfer(msg.sender, jackpot);
+      LotteryFactory(factory).payJackpot(msg.sender);
+      jackpotRecieved();
+    }
   }
-
 
 
   function closeLottery() onlyOwnerOrLotteryManager {
     uint256 tokenAmount;
     tokenAmount = betToken.balanceOf(this);
     betToken.transfer(factory, tokenAmount);
+    LotteryFactory(factory).closeLottery();
   }
 
 }
