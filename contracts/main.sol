@@ -1,4 +1,4 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.18;
 
 /**
  * @title Ownable
@@ -232,7 +232,7 @@ contract Mintable is StandardToken, Ownable {
 
 }
 
-contract Nafen is Mintable {
+contract Token is Mintable {
 
   string public constant name = "TEST BET";
 
