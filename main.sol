@@ -269,7 +269,8 @@ contract LotteryFactory is Ownable {
 
   uint256 public jackpot;
   uint256 lotteryCounter;
-  mapping (address => bool) public lotteries;
+  address[] public lotteries;
+  mapping (address => bool) public activeLotteries;
   address token;
   ERC20 betToken;
 
@@ -287,17 +288,18 @@ contract LotteryFactory is Ownable {
   {
     require(betToken.balanceOf(this) >= _tokenAmount);
     address newLottery = new Lottery(token, owner, _startLotteryBlock, _stopLotteryBlock, _closeLotteryBlock);
-    lotteries[newLottery] = true;
+    activeLotteries[newLottery] = true;
+    lotteries.push(newLottery);
     betToken.transfer(newLottery, _tokenAmount);
   }
 
   function payJackpot(address _to) {
-    require(lotteries[msg.sender]);
+    require(activeLotteries[msg.sender]);
     betToken.transfer(_to, jackpot);
   }
 
   function closeLottery() {
-    lotteries[msg.sender] = false;
+    activeLotteries[msg.sender] = false;
   }
 
 }
@@ -369,7 +371,7 @@ contract Lottery is Ownable, ReentrancyGuard {
     dataPowerPlay[3] = 4;
     dataPowerPlay[4] = 5;
     dataPowerPlay[5] = 10;
-    owner = owner;
+    owner = _owner;
     startLotteryBlock = _startLotteryBlock;
     stopLotteryBlock = _stopLotteryBlock;
     closeLotteryBlock = _closeLotteryBlock;
@@ -399,8 +401,7 @@ contract Lottery is Ownable, ReentrancyGuard {
     jackpot += tokenAmount;
   }
 
-  function random(uint8 upper) public returns (uint8 randomNumber) {
-    require(block.number > blockForRandom);
+  function random(uint8 upper) public returns (uint8 randomNumber) { // must be internal
     _seed = uint8(sha3(block.blockhash(blockForRandom), _seed));
     return _seed % upper;
   }
@@ -408,7 +409,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   event WinTicketChoosen();
 
   function chooseWinTicket() onlyOwnerOrLotteryManager {
-    require(block.number > blockForRandom);
+    //require(block.number > blockForRandom);
     winTicket.wb1 = random(69);
     winTicket.wb2 = random(69);
     winTicket.wb3 = random(69);
@@ -434,10 +435,12 @@ contract Lottery is Ownable, ReentrancyGuard {
     count[0] = 0;
     count[1] = 0;
     Ticket _ticket;
+    uint8 wbCount;
+    uint8 rb;
     for (uint i = 0; i < usersTickets[player].length; i++) {
       _ticket = usersTickets[player][i];
-      uint8 wbCount;
-      uint8 rb;
+      wbCount = 0;
+      rb = 0;
       if (_ticket.wb1 == winTicket.wb1) {
         wbCount++;
       }
