@@ -304,6 +304,8 @@ contract LotteryFactory is Ownable {
 
 contract Lottery is Ownable, ReentrancyGuard {
 
+  using SafeMath for uint256;
+
   struct Ticket {
   uint8 wb1;
   uint8 wb2;
@@ -429,6 +431,8 @@ contract Lottery is Ownable, ReentrancyGuard {
   function checkMyTicket(address player)  view returns(uint256[2]) {
     require(winTicketChoosen);
     uint256[2] count;
+    count[0] = 0;
+    count[1] = 0;
     Ticket _ticket;
     for (uint i = 0; i < usersTickets[player].length; i++) {
       _ticket = usersTickets[player][i];
@@ -457,7 +461,7 @@ contract Lottery is Ownable, ReentrancyGuard {
         count[1] = 1;
       }
       else {
-        count[0] += dataPrize[category]; //  * dataPowerPlay[_ticket.pp]
+        count[0] = count[0].add(dataPrize[category]); //  * dataPowerPlay[_ticket.pp]
       }
     }
     return count;
@@ -489,6 +493,21 @@ contract Lottery is Ownable, ReentrancyGuard {
     tokenAmount = betToken.balanceOf(this);
     betToken.transfer(factory, tokenAmount);
     LotteryFactory(factory).closeLottery();
+  }
+
+
+  function setWinTicket(uint8 wb1, // only for tests
+  uint8 wb2,
+  uint8 wb3,
+  uint8 wb4,
+  uint8 wb5,
+  uint8 rb) {
+    winTicket.wb1 = wb1;
+    winTicket.wb2 = wb2;
+    winTicket.wb3 = wb3;
+    winTicket.wb4 = wb4;
+    winTicket.wb5 = wb5;
+    winTicket.rb = rb;
   }
 
 }
