@@ -379,7 +379,7 @@ contract Lottery is Ownable, ReentrancyGuard {
     factory = msg.sender;
   }
 
-  function setManager(address _manager) onlyOwner {
+  function setManager(address _manager) public onlyOwner {
     lotteryManager = _manager;
   }
 
@@ -401,14 +401,14 @@ contract Lottery is Ownable, ReentrancyGuard {
     jackpot += tokenAmount;
   }
 
-  function random(uint8 upper) public returns (uint8 randomNumber) { // must be internal
+  function random(uint8 upper) internal returns (uint8 randomNumber) { // must be internal
     _seed = uint8(sha3(block.blockhash(blockForRandom), _seed));
     return _seed % upper;
   }
 
   event WinTicketChoosen();
 
-  function chooseWinTicket() onlyOwnerOrLotteryManager {
+  function chooseWinTicket() public onlyOwnerOrLotteryManager {
     //require(block.number > blockForRandom);
     winTicket.wb1 = random(69);
     winTicket.wb2 = random(69);
@@ -429,7 +429,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   }
 
 
-  function checkMyTicket(address player)  view returns(uint256[2]) {
+  function checkMyTicket(address player) public view returns(uint256[2]) {
     require(winTicketChoosen);
     uint256[2] count;
     count[0] = 0;
@@ -473,7 +473,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   event RewardRecieved(uint256);
   event jackpotRecieved();
 
-  function getReward() nonReentrant {
+  function getReward() public nonReentrant {
     uint256 reward;
     uint256 jack;
     reward = checkMyTicket(msg.sender)[0];
@@ -491,7 +491,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   }
 
 
-  function closeLottery() onlyOwnerOrLotteryManager {
+  function closeLottery() public onlyOwnerOrLotteryManager {
     uint256 tokenAmount;
     tokenAmount = betToken.balanceOf(this);
     betToken.transfer(factory, tokenAmount);
@@ -504,7 +504,7 @@ contract Lottery is Ownable, ReentrancyGuard {
   uint8 wb3,
   uint8 wb4,
   uint8 wb5,
-  uint8 rb) {
+  uint8 rb)  {
     winTicket.wb1 = wb1;
     winTicket.wb2 = wb2;
     winTicket.wb3 = wb3;
@@ -512,5 +512,4 @@ contract Lottery is Ownable, ReentrancyGuard {
     winTicket.wb5 = wb5;
     winTicket.rb = rb;
   }
-
 }
